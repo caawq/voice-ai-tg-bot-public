@@ -14,12 +14,17 @@
 "шаблона": один HTML-файл с версткой + любые данные на входе.
 """
 
+import os
 import pathlib
+
 from jinja2 import Environment, FileSystemLoader
 from playwright.sync_api import sync_playwright
 
 TEMPLATE_DIR = pathlib.Path(__file__).parent
-CHROMIUM_PATH = "/opt/pw-browsers/chromium"  # путь к preinstalled Chromium в этом окружении
+# Путь к Chromium. Пусто (обычный случай) — Playwright берёт свой собственный
+# браузер, установленный командой `playwright install chromium`. Переменная нужна
+# только там, где Chromium лежит в нестандартном месте (например, в CI-образе).
+CHROMIUM_PATH = os.environ.get("CHROMIUM_PATH", "")
 
 
 def render_week_image(data: dict, theme: str, out_path: str) -> None:
@@ -51,7 +56,8 @@ def render_week_image(data: dict, theme: str, out_path: str) -> None:
     html_path.write_text(html, encoding="utf-8")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(executable_path=CHROMIUM_PATH)
+        launch_kwargs = {"executable_path": CHROMIUM_PATH} if CHROMIUM_PATH else {}
+        browser = p.chromium.launch(**launch_kwargs)
         page = browser.new_page(viewport={"width": 1200, "height": 200}, device_scale_factor=1)
         page.goto("file://" + str(html_path.resolve()))
         # .week-card сам определяет свою высоту по контенту (сколько задач в неделе) —
