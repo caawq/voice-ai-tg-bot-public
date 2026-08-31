@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: transparent;
+  }
+
+  :root, [data-theme="light"] {
+    --bg: #fcfcfb;
+    --ink1: #0b0b0b;
+    --ink2: #52514e;
+    --ink3: #898781;
+    --div: #e1e0d9;
+    --event: #2a78d6;
+    --task: #eb6834;
+    --goal: #1baf7a;
+    --good: #0ca30c;
+    --overdue-bg: rgba(250,178,25,0.16);
+    --overdue-accent: #b5790a;
+  }
+  [data-theme="dark"] {
+    --bg: #1a1a19;
+    --ink1: #ffffff;
+    --ink2: #c3c2b7;
+    --ink3: #898781;
+    --div: #2c2c2a;
+    --event: #3987e5;
+    --task: #d95926;
+    --goal: #199e70;
+    --good: #0ca30c;
+    --overdue-bg: rgba(250,178,25,0.20);
+    --overdue-accent: #fab219;
+  }
+
+  /* item colors carry meaning (identity), so they stay literal per-role,
+     never swapped by theme beyond the two blocks above */
+
+  .week-card {
+    width: 1080px;
+    background: var(--bg);
+    padding: 56px 48px 48px;
+    display: flex;
+    flex-direction: column;
+  }
+  .eyebrow { font-size: 20px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--ink3); }
+  .daterange { font-size: 52px; font-weight: 800; color: var(--ink1); margin: 8px 0 30px; line-height: 1; }
+  .goal-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .goal-label { font-size: 24px; font-weight: 500; color: var(--ink2); }
+  .goal-percent { font-size: 34px; font-weight: 800; color: var(--ink1); }
+  .goal-track { width: 100%; height: 20px; border-radius: 10px; background: var(--div); overflow: hidden; margin-bottom: 40px; }
+  .goal-fill { height: 100%; border-radius: 10px; background: var(--goal); }
+  .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; align-items: start; }
+  .col { display: flex; flex-direction: column; gap: 8px; }
+  .col-head { margin-bottom: 6px; }
+  .day-name { display: block; font-size: 15px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--ink2); }
+  .day-num { display: block; font-size: 13px; color: var(--ink3); margin-top: 2px; }
+  .item { border-radius: 4px; padding: 10px; font-size: 15px; line-height: 1.25; overflow-wrap: break-word; }
+  .item .time { display: block; font-size: 13px; font-weight: 800; opacity: .85; margin-bottom: 2px; }
+  .item.event { background: var(--event); color: #ffffff; font-weight: 600; }
+  .item.task { background: var(--task); color: #ffffff; font-weight: 600; }
+  .item.task_done {
+    background: transparent; border: 2px solid var(--div); color: var(--ink3);
+    text-decoration: line-through; opacity: .85; display: flex; align-items: center; gap: 6px;
+  }
+  .item.overdue {
+    background: var(--overdue-bg); color: var(--ink1); font-weight: 600;
+    display: flex; align-items: flex-start; gap: 6px;
+  }
+  .icon { flex-shrink: 0; width: 14px; height: 14px; margin-top: 2px; }
+  .icon.good { color: var(--good); }
+  .icon.warn { color: var(--overdue-accent); }
+</style>
+</head>
+<body data-theme="{{ theme }}">
+  <div class="week-card">
+    <div class="eyebrow">Хронология недели</div>
+    <div class="daterange">{{ date_range }}</div>
+
+    {% if goal %}
+    <div class="goal-row">
+      <div class="goal-label">Цель · {{ goal.label }}</div>
+      <div class="goal-percent">{{ goal.percent }}%</div>
+    </div>
+    <div class="goal-track"><div class="goal-fill" style="width: {{ goal.percent }}%;"></div></div>
+    {% endif %}
+
+    <div class="grid">
+      {% for day in days %}
+      <div class="col">
+        <div class="col-head">
+          <span class="day-name">{{ day.name }}</span><span class="day-num">{{ day.num }}</span>
+        </div>
+        {% for item in day['items'] %}
+          {% if item.type == "event" %}
+            <div class="item event"><span class="time">{{ item.time }}</span>{{ item.label }}</div>
+          {% elif item.type == "task" %}
+            <div class="item task">{{ item.label }}</div>
+          {% elif item.type == "task_done" %}
+            <div class="item task_done">
+              <svg class="icon good" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              {{ item.label }}
+            </div>
+          {% elif item.type == "overdue" %}
+            <div class="item overdue">
+              <svg class="icon warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><line x1="12" y1="8" x2="12" y2="13"></line><line x1="12" y1="16" x2="12" y2="16.01"></line></svg>
+              {{ item.label }}
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</body>
+</html>
