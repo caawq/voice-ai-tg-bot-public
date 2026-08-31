@@ -10,7 +10,8 @@ env/
 .env
 
 # Временный вывод рендера (не сами шаблоны в /render, а сгенерированные файлы)
-render/sample-*.png
+render/*.png
+render/out/
 *.render.html
 
 # Редакторы/ОС
