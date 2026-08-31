@@ -22,3 +22,24 @@ def require_bot_token() -> str:
             "(получить у @BotFather)."
         )
     return BOT_TOKEN
+
+
+def require_database_url() -> str:
+    """
+    Строка подключения к БД, приведённая к асинхронному драйверу.
+
+    Хостинги (Railway, Render, Heroku и прочие) отдают DATABASE_URL в виде
+    postgres://... или postgresql://... — оба варианта уедут в синхронный
+    драйвер и упадут на первом же запросе. Чиним здесь один раз, а не ловим
+    потом на деплое.
+    """
+    if not DATABASE_URL:
+        raise RuntimeError(
+            "DATABASE_URL не задан. Скопируй .env.example в .env и укажи строку "
+            "подключения к PostgreSQL."
+        )
+    url = DATABASE_URL
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+asyncpg://" + url[len(prefix):]
+    return url
