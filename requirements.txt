@@ -1,6 +1,10 @@
 # Бот
 aiogram>=3.31,<4
 python-dotenv>=1.0,<2
+# База часовых поясов IANA. В Linux/macOS она системная, в Windows её нет —
+# без этого пакета zoneinfo.ZoneInfo('Europe/Moscow') падает на Windows.
+# На Linux/macOS пакет просто не используется, лишним не будет.
+tzdata>=2024.1; sys_platform == 'win32'
 
 # Рендер "хронологии недели" (render/render_week.py) — используется со
 # следующего шага; для скелета не нужен, но фиксируем версии сразу.
