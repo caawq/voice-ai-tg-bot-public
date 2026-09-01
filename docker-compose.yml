@@ -1,0 +1,44 @@
+# Локальный прод: бот + PostgreSQL на одной машине.
+#
+#   docker compose up -d --build      поднять
+#   docker compose logs -f bot        смотреть логи бота
+#   docker compose exec bot alembic upgrade head   накатить миграции
+#   docker compose down               остановить (данные в базе останутся)
+#   docker compose down -v            остановить и стереть данные базы
+#
+# Секреты бота (BOT_TOKEN, LLM_API_KEY и т.д.) берутся из .env — он уже в
+# .gitignore и в .dockerignore, в образ не попадает. Пароль от Postgres —
+# из тех же переменных POSTGRES_*, которые Compose сам подставит из .env.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-voicebot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD не задан в .env}
+      POSTGRES_DB: ${POSTGRES_DB:-voicebot}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-voicebot}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Собираем DATABASE_URL из POSTGRES_* сами: адрес базы внутри сети Docker —
+      # всегда "db", это имя сервиса выше, а не то, что лежит в .env для локального
+      # запуска без Docker. environment: имеет приоритет над env_file:, поэтому
+      # пустой DATABASE_URL из .env здесь перекрывается этим значением.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-voicebot}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-voicebot}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
