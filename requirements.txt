@@ -11,3 +11,6 @@ playwright>=1.40,<2
 SQLAlchemy[asyncio]>=2.0,<3
 alembic>=1.13,<2
 asyncpg>=0.29,<1
+
+# Разбор голосовых через LLM (любой OpenAI-совместимый провайдер)
+openai>=1.40,<2

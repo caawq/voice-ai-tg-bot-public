@@ -11,6 +11,13 @@ load_dotenv()
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
+# Любой OpenAI-совместимый эндпоинт: сама OpenAI, OpenRouter, proxyapi.ru,
+# DeepSeek, локальная модель. Меняется только эта строка и имя модели.
+LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "https://api.openai.com/v1")
+LLM_MODEL = os.environ.get("LLM_MODEL", "gpt-4o-mini")
+# json_schema — strict structured output (надёжнее); tools — function calling
+# (поддерживается более широким кругом совместимых провайдеров).
+LLM_STRUCTURED_MODE = os.environ.get("LLM_STRUCTURED_MODE", "json_schema")
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
 
@@ -43,3 +50,13 @@ def require_database_url() -> str:
         if url.startswith(prefix):
             return "postgresql+asyncpg://" + url[len(prefix):]
     return url
+
+
+def require_llm_api_key() -> str:
+    """Ключ LLM-провайдера. Падаем на старте, а не в момент первого голосового."""
+    if not LLM_API_KEY:
+        raise RuntimeError(
+            "LLM_API_KEY не задан. Скопируй .env.example в .env и укажи ключ "
+            "провайдера (см. LLM_BASE_URL — он должен быть от того же провайдера)."
+        )
+    return LLM_API_KEY
