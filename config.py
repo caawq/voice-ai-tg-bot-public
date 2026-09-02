@@ -18,6 +18,10 @@ LLM_MODEL = os.environ.get("LLM_MODEL", "gpt-4o-mini")
 # json_schema — strict structured output (надёжнее); tools — function calling
 # (поддерживается более широким кругом совместимых провайдеров).
 LLM_STRUCTURED_MODE = os.environ.get("LLM_STRUCTURED_MODE", "json_schema")
+# Модель для транскрипции голосовых. По умолчанию — та же, что и для
+# разбора (LLM_MODEL); переопределить есть смысл только если у провайдера
+# распознавание речи и структурирование текста — разные модели.
+TRANSCRIBE_MODEL = os.environ.get("TRANSCRIBE_MODEL", "")
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
 
