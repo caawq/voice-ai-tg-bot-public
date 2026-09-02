@@ -293,3 +293,38 @@ def test_повторное_да_на_ту_же_карточку_не_падае
 
     rows = run(_fetch())
     assert len(rows) == 1, "повторное подтверждение не должно создавать вторую запись"
+
+
+def test_текстовое_сообщение_разбирается_как_запись():
+    """Промпт 6 (доп.): текстом — тот же путь, что и голосом, только без транскрипции."""
+    llm = FakeLLM(payload(item("task", "купить корм коту", date=TOMORROW)))
+    bot = FakeBot()
+    message = FakeMessage(bot, chat_id=1, user_id=777, text="напомни купить корм коту")
+
+    run(voice_handlers.handle_text(message, llm_client=llm))
+
+    assert len(bot.sent) == 1
+    assert "корм коту" in bot.sent[0]["text"]
+    assert bot.sent[0]["reply_markup"] is not None, "у текстовой записи те же кнопки подтверждения"
+
+
+def test_текстовая_запись_сохраняется_без_voice_file_id():
+    llm = FakeLLM(payload(item("task", "купить корм коту", date=TOMORROW)))
+    bot = FakeBot()
+    message = FakeMessage(bot, chat_id=1, user_id=777, text="напомни купить корм коту")
+
+    run(voice_handlers.handle_text(message, llm_client=llm))
+    attempt_id = bot.sent[0]["reply_markup"].inline_keyboard[0][0].callback_data[len(CONFIRM_PREFIX):]
+
+    editable = FakeEditableMessage(bot, chat_id=1, message_id=1, text=bot.sent[0]["text"])
+    run(voice_handlers.handle_confirm(FakeCallback(data=f"{CONFIRM_PREFIX}{attempt_id}", user_id=777, message=editable)))
+
+    async def _fetch():
+        async with session_scope() as session:
+            from sqlalchemy import select
+            return (await session.scalars(select(Item))).all()
+
+    rows = run(_fetch())
+    assert len(rows) == 1
+    assert rows[0].voice_file_id is None, "переслушивать нечего — file_id остаётся пустым"
+    assert rows[0].source_transcript == "напомни купить корм коту", "исходный текст всё равно сохраняем"

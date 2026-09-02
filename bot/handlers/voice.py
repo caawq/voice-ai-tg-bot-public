@@ -139,7 +139,32 @@ async def handle_voice(
     transcript = await _transcribe_voice(message, transcription_client)
     if transcript is None:
         return
+    await _handle_transcript(message, transcript, voice_file_id=message.voice.file_id, llm_client=llm_client)
 
+
+@router.message(F.text, ~F.text.startswith("/"))
+async def handle_text(message: Message, llm_client: LLMClient) -> None:
+    """
+    Запись обычным текстом — тот же путь, что и голосовое, минус скачивание и
+    транскрипция.
+
+    Регистрируется последним из текстовых: правка (в состоянии awaiting_correction)
+    и все команды разбираются раньше. Команды дополнительно отсечены фильтром —
+    иначе опечатка в команде уехала бы в модель как новая запись.
+    """
+    await _handle_transcript(message, message.text or "", voice_file_id=None, llm_client=llm_client)
+
+
+async def _handle_transcript(
+    message: Message, transcript: str, *, voice_file_id: str | None, llm_client: LLMClient
+) -> None:
+    """
+    Общая часть голосового и текстового ввода: разобрать и показать карточки.
+
+    voice_file_id есть только у голосового — у текстовой записи переслушивать
+    нечего, и в базе останется NULL (db/models.py это допускает), а сам текст
+    всё равно сохранится в source_transcript.
+    """
     async with session_scope() as session:
         user = await get_or_create_user(session, message.from_user.id)
         user_timezone = user.timezone
@@ -156,12 +181,12 @@ async def handle_voice(
             state=FlowState.failed,
             issue=result.issue,
             detail=result.detail,
-            voice_file_id=message.voice.file_id,
+            voice_file_id=voice_file_id,
         )
         await message.answer(confirmation_text(failed))
         return
 
-    attempts = split_attempts(transcript, result.items, voice_file_id=message.voice.file_id)
+    attempts = split_attempts(transcript, result.items, voice_file_id=voice_file_id)
     await _send_attempts(message.bot, message.chat.id, attempts)
 
 
