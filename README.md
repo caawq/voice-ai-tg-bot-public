@@ -85,6 +85,25 @@ alembic revision --autogenerate -m "короткое описание"
 `postgresql://`, которые отдают хостинги, приводятся к асинхронному драйверу
 автоматически (`config.require_database_url`).
 
+## Запуск через Docker (локальный прод)
+
+Бот и PostgreSQL поднимаются одной командой, без ручной установки Python и
+Postgres на хост-машину:
+
+```bash
+docker compose up -d --build      # собрать и поднять бота и базу
+docker compose logs -f bot        # смотреть логи бота, Ctrl+C — выйти из просмотра
+docker compose exec bot alembic upgrade head   # накатить миграции на базу в контейнере
+docker compose down               # остановить (данные в базе останутся)
+docker compose down -v            # остановить и стереть данные базы
+```
+
+`BOT_TOKEN`, `LLM_API_KEY` и остальные секреты бот берёт из `.env` — файл не
+попадает ни в образ (см. `.dockerignore`), ни в git. `DATABASE_URL` для
+Docker-запуска задавать не нужно: `docker-compose.yml` собирает его сам из
+`POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` в `.env`, адрес базы
+внутри docker-сети — всегда `db` (имя сервиса), а не `localhost`.
+
 ## Разбор голосовых
 
 `services/voice_parsing.py` превращает расшифровку в список записей, а
