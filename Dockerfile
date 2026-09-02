@@ -22,6 +22,12 @@ RUN apt-get update \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Playwright сам скачивает Chromium, но не системные библиотеки под него —
+# на голом python:3.12-slim рендер (render/render_week.py, Промпт 5) без
+# этого падает на старте ("Executable doesn't exist" / отсутствующие .so).
+# --with-deps ставит и то, и другое через apt за один шаг.
+RUN playwright install --with-deps chromium
+
 COPY . .
 
 CMD ["python", "-m", "bot.main"]
