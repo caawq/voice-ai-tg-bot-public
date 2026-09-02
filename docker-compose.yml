@@ -18,6 +18,12 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-voicebot}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD не задан в .env}
       POSTGRES_DB: ${POSTGRES_DB:-voicebot}
+    ports:
+      # Для запуска бота вне Docker (например, чтобы он ходил в интернет через
+      # VPN хоста, пока провайдер закрыт по географии): база становится видна
+      # как 127.0.0.1:5432. Привязка именно к 127.0.0.1, а не к 0.0.0.0 —
+      # порт доступен только с этой машины, не из сети.
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
