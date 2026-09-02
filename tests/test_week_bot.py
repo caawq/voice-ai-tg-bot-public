@@ -40,10 +40,12 @@ class FakeBot:
         self.sent_photos: list[dict[str, Any]] = []
         self._fail_send = fail_send
 
-    async def send_photo(self, chat_id: int, photo):
+    async def send_photo(self, chat_id: int, photo, caption=None, reply_markup=None):
         if self._fail_send:
             raise RuntimeError("сеть моргнула")
-        self.sent_photos.append({"chat_id": chat_id, "path": photo.path})
+        self.sent_photos.append(
+            {"chat_id": chat_id, "path": photo.path, "caption": caption, "markup": reply_markup}
+        )
 
 
 class FakeMessage:
@@ -100,6 +102,13 @@ def test_week_отправляет_фото_и_убирает_временный
     assert bot.sent_photos[0]["chat_id"] == 100
     sent_path = pathlib.Path(bot.sent_photos[0]["path"])
     assert not sent_path.exists(), "временный PNG должен быть удалён после отправки"
+
+    # Промпт 6, п.5: под обложкой — кнопка на каждую запись недели.
+    markup = bot.sent_photos[0]["markup"]
+    assert markup is not None
+    labels = [b.text for row in markup.inline_keyboard for b in row]
+    assert any("Купить корм коту" in label for label in labels)
+    assert bot.sent_photos[0]["caption"], "к обложке нужна подпись — её же редактирует карточка"
 
 
 def test_week_убирает_временный_файл_даже_если_отправка_упала():
