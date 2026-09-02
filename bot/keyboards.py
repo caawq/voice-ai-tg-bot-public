@@ -19,3 +19,25 @@ def confirmation_keyboard(attempt_id: str) -> InlineKeyboardMarkup:
             ]
         ]
     )
+
+
+# Вечерний чек-ин (Промпт 4): три действия на одну задачу, item.id прямо в
+# callback_data — доп. состояние в bot/state.py не нужно, задача сама себе
+# идентификатор.
+CHECKIN_POSTPONE_PREFIX = "c:p:"
+CHECKIN_KEEP_PREFIX = "c:k:"
+CHECKIN_DELETE_PREFIX = "c:d:"
+
+
+def checkin_task_keyboard(item_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Перенести на завтра", callback_data=f"{CHECKIN_POSTPONE_PREFIX}{item_id}"
+                ),
+                InlineKeyboardButton(text="Оставить", callback_data=f"{CHECKIN_KEEP_PREFIX}{item_id}"),
+                InlineKeyboardButton(text="Удалить", callback_data=f"{CHECKIN_DELETE_PREFIX}{item_id}"),
+            ]
+        ]
+    )
