@@ -89,6 +89,12 @@ class User(Base):
     # явно переключить командой /theme dark|light — выбор запоминается сюда.
     theme: Mapped[str] = mapped_column(String(5), nullable=False, server_default=text("'light'"))
 
+    # Час вечернего чек-ина по локальному времени пользователя (Промпт 6,
+    # /settings). Раньше был константой в коде (services/checkin.CHECKIN_HOUR),
+    # теперь это настройка: 20 остаётся дефолтом схемы, но пользователь может
+    # выбрать другой час.
+    checkin_hour: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text("20"))
+
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -100,7 +106,10 @@ class User(Base):
         foreign_keys="Item.user_id",
     )
 
-    __table_args__ = (CheckConstraint("theme IN ('light', 'dark')", name="ck_users_theme_valid"),)
+    __table_args__ = (
+        CheckConstraint("theme IN ('light', 'dark')", name="ck_users_theme_valid"),
+        CheckConstraint("checkin_hour BETWEEN 0 AND 23", name="ck_users_checkin_hour_range"),
+    )
 
     def __repr__(self) -> str:  # pragma: no cover - удобство отладки
         return f"<User id={self.id} tg={self.telegram_id} tz={self.timezone!r}>"

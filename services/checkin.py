@@ -18,12 +18,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.models import User
 from services import timeframe
 
-# 20:00 — конкретное решение продукта (Промпт 4), не настройка пользователя:
-# вечерний чек-ин про итоги дня, а не про произвольное время напоминания.
+# Дефолт: 20:00. С Промпта 6 это уже не константа поведения, а лишь значение
+# по умолчанию — час хранится в users.checkin_hour и меняется через /settings.
+# Здесь оно остаётся как единственное место, где записан "дефолт продукта".
 CHECKIN_HOUR = 20
 
 
-def is_checkin_hour(timezone: str, at_utc: dt.datetime) -> bool:
+def is_checkin_hour(timezone: str, at_utc: dt.datetime, hour: int = CHECKIN_HOUR) -> bool:
     """
     Наступил ли сейчас (at_utc) час вечернего чек-ина в поясе ``timezone``.
 
@@ -36,7 +37,7 @@ def is_checkin_hour(timezone: str, at_utc: dt.datetime) -> bool:
     все 24 значения ровно по одному разу за 24 часовых прогона — так что
     двойной отправки или пропуска из-за дробного смещения не происходит.
     """
-    return timeframe.to_local(at_utc, timezone).hour == CHECKIN_HOUR
+    return timeframe.to_local(at_utc, timezone).hour == hour
 
 
 async def due_users(session: AsyncSession, at_utc: dt.datetime) -> list[User]:
@@ -51,4 +52,4 @@ async def due_users(session: AsyncSession, at_utc: dt.datetime) -> list[User]:
     смещение отдельной колонкой и фильтровать в SQL).
     """
     users = list((await session.scalars(select(User))).all())
-    return [u for u in users if is_checkin_hour(u.timezone, at_utc)]
+    return [u for u in users if is_checkin_hour(u.timezone, at_utc, u.checkin_hour)]
