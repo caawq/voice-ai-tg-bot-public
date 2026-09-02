@@ -116,9 +116,16 @@ async def handle_correction_voice(
     await _apply_correction(message, state, llm_client, correction)
 
 
-@router.message(VoiceFlow.awaiting_correction, F.text)
+@router.message(VoiceFlow.awaiting_correction, F.text, ~F.text.startswith("/"))
 async def handle_correction_text(message: Message, state: FSMContext, llm_client: LLMClient) -> None:
-    """Правка текстом."""
+    """
+    Правка текстом.
+
+    Команды сюда не попадают (~F.text.startswith("/")): с Промпта 6 у бота есть
+    меню команд, и человек, зависший в режиме правки, должен иметь возможность
+    просто нажать /list — а не увидеть, как его команда уезжает в модель как
+    уточнение к записи.
+    """
     await _apply_correction(message, state, llm_client, message.text or "")
 
 

@@ -24,7 +24,9 @@ from aiogram.types import FSInputFile, Message
 from db.models import Item, User
 from db.session import session_scope
 from render.render_week import render_week_image
+from bot import views
 from services import items as items_svc
+from services import records as records_svc
 from services import timeframe
 from services import users as users_svc
 from services import week_render, week_schedule
@@ -48,10 +50,25 @@ async def send_week_image(
     """Отрендерить неделю в PNG и отправить, гарантированно убрав временный файл."""
     data = week_render.build_week_data(items, monday, user.timezone, today)
 
+    # Кнопки-записи под обложкой (Промпт 6, п.5): порядок Пн -> Вс, первая
+    # страница; дальше их листает и открывает уже bot/handlers/records.py —
+    # тот же компонент, что в /list, поэтому карточка везде одна и та же.
+    buttons = sorted(items, key=lambda i: views.week_sort_key(i, user.timezone))
+    size = records_svc.PAGE_SIZE
+    total_pages = max(1, (len(buttons) + size - 1) // size)
+    keyboard = (
+        views.week_keyboard(buttons[:size], 0, total_pages, today, user.timezone) if buttons else None
+    )
+
     out_path = tempfile.mktemp(suffix=".png", prefix="week-")
     try:
         await asyncio.to_thread(render_week_image, data, user.theme, out_path)
-        await bot.send_photo(chat_id, FSInputFile(out_path))
+        await bot.send_photo(
+            chat_id,
+            FSInputFile(out_path),
+            caption=views.WEEK_CAPTION if buttons else None,
+            reply_markup=keyboard,
+        )
     finally:
         pathlib.Path(out_path).unlink(missing_ok=True)
 

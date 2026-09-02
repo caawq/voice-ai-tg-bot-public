@@ -1,7 +1,7 @@
 """
-Точка входа: бот поднимается, отвечает на /start, принимает голосовые и раз в
-час рассылает вечерний чек-ин и картинку недели тем, у кого сейчас их момент
-по локальному времени.
+Точка входа: бот поднимается, отвечает на команды и голосовые и раз в час
+рассылает вечерний чек-ин и картинку недели тем, у кого сейчас их момент по
+локальному времени.
 
 Запуск из корня проекта: python -m bot.main
 """
@@ -12,7 +12,8 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from bot.handlers import checkin, start, voice, week
+from bot.handlers import checkin, navigation, records, settings, voice, week
+from bot.handlers.navigation import setup_bot_commands
 from bot.scheduler import hourly_loop
 from config import require_bot_token
 from services.llm import OpenAICompatibleClient
@@ -23,10 +24,16 @@ def create_dispatcher() -> Dispatcher:
     # и bot/state.py: перезапуск бота теряет незавершённые правки, но не
     # данные в базе (см. docstring bot/state.py).
     dp = Dispatcher(storage=MemoryStorage())
-    dp.include_router(start.router)
-    dp.include_router(voice.router)
-    dp.include_router(checkin.router)
+
+    # Порядок важен: роутеры с командами идут до voice. У voice есть хендлер
+    # на любой текст в состоянии "жду правку" — команды должны разбираться
+    # раньше, чем он до них доберётся (второй рубеж — фильтр в самом voice).
+    dp.include_router(navigation.router)
+    dp.include_router(records.router)
+    dp.include_router(settings.router)
     dp.include_router(week.router)
+    dp.include_router(checkin.router)
+    dp.include_router(voice.router)
     return dp
 
 
@@ -42,6 +49,8 @@ async def main() -> None:
     # start_polling прокидывает именованные kwargs в хендлеры как
     # dependency injection.
     client = OpenAICompatibleClient()
+
+    await setup_bot_commands(bot)
 
     # Часовой планировщик (чек-ин + картинка недели) живёт фоновой задачей
     # рядом с polling'ом (см. bot/scheduler.py) — при остановке бота его
