@@ -1,6 +1,7 @@
 """
 Точка входа: бот поднимается, отвечает на /start, принимает голосовые и раз в
-час рассылает вечерний чек-ин тем, у кого сейчас 20:00 по их поясу.
+час рассылает вечерний чек-ин и картинку недели тем, у кого сейчас их момент
+по локальному времени.
 
 Запуск из корня проекта: python -m bot.main
 """
@@ -11,8 +12,8 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from bot.handlers import checkin, start, voice
-from bot.scheduler import hourly_checkin_loop
+from bot.handlers import checkin, start, voice, week
+from bot.scheduler import hourly_loop
 from config import require_bot_token
 from services.llm import OpenAICompatibleClient
 
@@ -25,6 +26,7 @@ def create_dispatcher() -> Dispatcher:
     dp.include_router(start.router)
     dp.include_router(voice.router)
     dp.include_router(checkin.router)
+    dp.include_router(week.router)
     return dp
 
 
@@ -41,16 +43,17 @@ async def main() -> None:
     # dependency injection.
     client = OpenAICompatibleClient()
 
-    # Часовой чек-ин живёт фоновой задачей рядом с polling'ом (см.
-    # bot/scheduler.py) — при остановке бота его нужно снять явно, иначе
-    # asyncio пожалуется на незавершённую задачу при выходе из процесса.
-    checkin_task = asyncio.create_task(hourly_checkin_loop(bot))
+    # Часовой планировщик (чек-ин + картинка недели) живёт фоновой задачей
+    # рядом с polling'ом (см. bot/scheduler.py) — при остановке бота его
+    # нужно снять явно, иначе asyncio пожалуется на незавершённую задачу при
+    # выходе из процесса.
+    scheduler_task = asyncio.create_task(hourly_loop(bot))
 
     logging.info("Бот запущен, начинаю polling")
     try:
         await dp.start_polling(bot, llm_client=client, transcription_client=client)
     finally:
-        checkin_task.cancel()
+        scheduler_task.cancel()
 
 
 if __name__ == "__main__":
