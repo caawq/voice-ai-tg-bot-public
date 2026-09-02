@@ -1,5 +1,6 @@
 """
-Чтение записей: недельная картинка, вечерний чек-ин, просрочка.
+Запись и чтение записей: сохранение из разбора голосового, недельная картинка,
+вечерний чек-ин, просрочка.
 
 Здесь живут оба горячих запроса из схемы и вычисление просрочки. Про Telegram
 модуль не знает ничего — на вход сессия и пользователь, на выходе объекты.
@@ -18,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import Item, ItemStatus, ItemType, User
 from services import timeframe
+from services.voice_parsing import ParsedItem
 
 VISIBLE = Item.status != ItemStatus.deleted
 
@@ -111,3 +113,52 @@ async def overdue_tasks(session: AsyncSession, user: User) -> list[Item]:
     day = timeframe.today(user.timezone)
     stmt = pending_tasks_stmt(user, day, include_overdue=True).where(Item.due_date < day)
     return list((await session.scalars(stmt)).all())
+
+
+def item_from_parsed(user: User, parsed: ParsedItem, *, source_transcript: str, voice_file_id: str | None) -> Item:
+    """
+    Собрать строку items из результата разбора (services/voice_parsing.py).
+
+    Ничего не решает заново — ParsedItem уже прошёл валидацию формы в
+    voice_parsing._validate (событию есть час, у цели нет даты и т.д.), эта
+    функция только раскладывает уже проверенные поля по колонкам конкретной
+    записи и добавляет то, чего нет в ParsedItem: пользователя и контекст
+    исходного голосового (принцип "контекст сохраняется" из концепта — по
+    ним можно будет переслушать оригинал).
+    """
+    start_at = None
+    if parsed.type is ItemType.event:
+        assert parsed.date is not None and parsed.time is not None  # гарантировано валидацией
+        local_dt = dt.datetime.combine(parsed.date, parsed.time)
+        start_at = timeframe.to_utc(local_dt, user.timezone)
+
+    return Item(
+        user_id=user.id,
+        type=parsed.type,
+        status=ItemStatus.pending,
+        title=parsed.label,
+        start_at=start_at,
+        due_date=parsed.date if parsed.type is ItemType.task else None,
+        progress_percent=parsed.goal_progress,
+        source_transcript=source_transcript,
+        voice_file_id=voice_file_id,
+    )
+
+
+async def save_parsed_item(
+    session: AsyncSession,
+    user: User,
+    parsed: ParsedItem,
+    *,
+    source_transcript: str,
+    voice_file_id: str | None,
+) -> Item:
+    """
+    Сохранить одну подтверждённую запись. Коммит — забота вызывающего кода
+    (см. db.session.session_scope), здесь только add + flush, чтобы у объекта
+    сразу был id.
+    """
+    item = item_from_parsed(user, parsed, source_transcript=source_transcript, voice_file_id=voice_file_id)
+    session.add(item)
+    await session.flush()
+    return item

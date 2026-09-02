@@ -9,6 +9,14 @@ ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /app
 
+# ffmpeg — конвертация голосовых Telegram (OGG/Opus) в WAV перед отправкой
+# на транскрипцию, см. services/audio.py. Это системный бинарник, не
+# ставится через pip. --no-install-recommends и чистка apt-кэша сразу же —
+# чтобы не тащить в образ рекомендованный мусор и списки пакетов.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 # Зависимости отдельным слоем: Docker пересоберёт этот слой, только если
 # изменился requirements.txt, а не на каждую правку кода бота.
 COPY requirements.txt .

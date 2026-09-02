@@ -24,9 +24,11 @@ services/voice_parsing.py.
 
 from __future__ import annotations
 
+import base64
 from typing import Any, Protocol
 
 import config
+from services.transcription import TRANSCRIBE_SYSTEM_PROMPT, TranscriptionError
 
 
 class LLMError(RuntimeError):
@@ -66,6 +68,7 @@ class OpenAICompatibleClient:
             raise LLMError("Не установлен пакет openai: pip install -r requirements.txt") from exc
 
         self.model = model or config.LLM_MODEL
+        self.transcribe_model = config.TRANSCRIBE_MODEL or self.model
         self.structured_mode = structured_mode or config.LLM_STRUCTURED_MODE
         self._client = AsyncOpenAI(
             api_key=api_key or config.require_llm_api_key(),
@@ -127,3 +130,39 @@ class OpenAICompatibleClient:
         if not isinstance(parsed, dict):
             raise LLMError(f"Ожидался объект, пришло {type(parsed).__name__}")
         return parsed
+
+    async def transcribe(self, *, audio: bytes, mime_type: str) -> str:
+        """
+        Расшифровать голосовое через ту же связку (chat completions с блоком
+        "input_audio") — у Gemini нет отдельного эндпоинта в духе Whisper в
+        OpenAI-совместимом слое, аудио понимается только внутри обычного
+        сообщения. audio должен быть уже в WAV (см. services/audio.py) —
+        это единственный формат, который документация провайдера подтверждает
+        явно для этого поля.
+        """
+        audio_format = "wav" if "wav" in mime_type else mime_type.split("/")[-1]
+        try:
+            response = await self._client.chat.completions.create(
+                model=self.transcribe_model,
+                temperature=0,
+                messages=[
+                    {"role": "system", "content": TRANSCRIBE_SYSTEM_PROMPT},
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_audio",
+                                "input_audio": {
+                                    "data": base64.b64encode(audio).decode("ascii"),
+                                    "format": audio_format,
+                                },
+                            }
+                        ],
+                    },
+                ],
+            )
+        except Exception as exc:  # сеть, лимиты, неверный ключ, формат не понят
+            raise TranscriptionError(f"Провайдер не расшифровал аудио: {exc}") from exc
+
+        text = (response.choices[0].message.content or "").strip()
+        return text
