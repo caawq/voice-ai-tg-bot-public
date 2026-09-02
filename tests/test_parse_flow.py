@@ -177,3 +177,28 @@ def test_сервисный_слой_не_знает_про_telegram():
             if stripped.startswith(("import ", "from ")) and ("aiogram" in stripped or "telegram" in stripped):
                 offenders.append(f"{path.name}: {stripped}")
     assert offenders == [], f"сервисный слой полез в Telegram: {offenders}"
+
+
+def test_недоступный_провайдер_не_советует_переформулировать():
+    """
+    Поймано на живом боте: Gemini отвечал "User location is not supported",
+    а бот предлагал "скажите иначе" — совет, который не может сработать.
+    """
+    llm = FakeLLM(error=LLMError("User location is not supported for the API use"))
+    attempt = start(llm, "во вторник к врачу")
+
+    assert attempt.state is FlowState.failed
+    assert attempt.issue is ParseIssue.provider_unavailable
+
+    text = parse_flow.confirmation_text(attempt)
+    assert "не отвечает" in text
+    assert "Скажите иначе" not in text, "нельзя предлагать переформулировать то, что не дошло до модели"
+
+
+def test_непонятое_сообщение_по_прежнему_просит_переформулировать():
+    """Обратная сторона: когда модель ответила, но разобрать нечего, совет уместен."""
+    llm = FakeLLM(payload())
+    attempt = start(llm, "ммм")
+
+    assert attempt.state is FlowState.failed
+    assert "Скажите иначе" in parse_flow.confirmation_text(attempt)

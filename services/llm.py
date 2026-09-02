@@ -70,10 +70,20 @@ class OpenAICompatibleClient:
         self.model = model or config.LLM_MODEL
         self.transcribe_model = config.TRANSCRIBE_MODEL or self.model
         self.structured_mode = structured_mode or config.LLM_STRUCTURED_MODE
+        # Прокси (config.LLM_PROXY) отдаём готовым http-клиентом: SDK не
+        # принимает адрес прокси параметром, но принимает клиента, который
+        # через него ходит.
+        http_client = None
+        if config.LLM_PROXY:
+            import httpx
+
+            http_client = httpx.AsyncClient(proxy=config.LLM_PROXY, timeout=timeout)
+
         self._client = AsyncOpenAI(
             api_key=api_key or config.require_llm_api_key(),
             base_url=base_url or config.LLM_BASE_URL,
             timeout=timeout,
+            http_client=http_client,
         )
 
     async def structured_call(

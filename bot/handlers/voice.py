@@ -23,6 +23,7 @@ services/parse_flow.py, см. его docstring).
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
@@ -53,6 +54,7 @@ from services.users import get_or_create_user
 from services.voice_parsing import parse_transcript
 
 router = Router(name="voice")
+logger = logging.getLogger(__name__)
 
 # Пауза между последовательными подтверждениями одного голосового. Не защита
 # от рейт-лимита Telegram (там запас на порядки больше), а UX: без паузы
@@ -70,8 +72,16 @@ async def _transcribe_voice(message: Message, transcription_client: Transcriptio
     try:
         wav = await ogg_to_wav(raw.read())
         transcript = await transcription_client.transcribe(audio=wav, mime_type="audio/wav")
-    except (AudioConversionError, TranscriptionError) as exc:
-        await message.answer(f"Не смог обработать голосовое: {exc}")
+    except (AudioConversionError, TranscriptionError):
+        # Подробности — в лог, человеку — человеческий текст. Раньше сюда
+        # уезжал сырой ответ провайдера целиком, вида
+        # "Error code: 400 - {'error': {'code': 400, 'message': 'User location
+        # is not supported...'}}" — увидено в реальной переписке.
+        logger.exception("Не удалось получить текст голосового")
+        await message.answer(
+            "Не получилось разобрать голосовое: сервис распознавания сейчас недоступен. "
+            "Попробуйте позже или напишите текстом."
+        )
         return None
 
     if not transcript.strip():

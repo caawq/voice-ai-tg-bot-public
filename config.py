@@ -22,6 +22,12 @@ LLM_STRUCTURED_MODE = os.environ.get("LLM_STRUCTURED_MODE", "json_schema")
 # разбора (LLM_MODEL); переопределить есть смысл только если у провайдера
 # распознавание речи и структурирование текста — разные модели.
 TRANSCRIBE_MODEL = os.environ.get("TRANSCRIBE_MODEL", "")
+# Прокси до LLM-провайдера, например "http://user:pass@host:port" или
+# "socks5://host:port". Нужен там, где провайдер закрыт по географии: Gemini
+# отвечает на запрос из неподдерживаемой страны ошибкой 400 "User location is
+# not supported for the API use" — и это не чинится ни ключом, ни моделью,
+# только маршрутом. Пусто — ходим напрямую.
+LLM_PROXY = os.environ.get("LLM_PROXY", "")
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
 

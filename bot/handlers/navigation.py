@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from aiogram import Bot, Router
 from aiogram.filters import Command, CommandStart
-from aiogram.types import BotCommand, BotCommandScopeDefault, Message
+from aiogram.types import BotCommand, BotCommandScopeDefault, MenuButtonCommands, Message
 
 from db.session import session_scope
 from services.users import get_or_create_user
@@ -67,8 +67,16 @@ HELP_TEXT = (
 
 
 async def setup_bot_commands(bot: Bot) -> None:
-    """Меню команд в интерфейсе Telegram (кнопка «Меню» рядом с полем ввода)."""
+    """
+    Меню команд в интерфейсе Telegram (кнопка рядом с полем ввода).
+
+    Кнопка меню задаётся явно (MenuButtonCommands), а не оставляется на
+    усмотрение клиента: у бота, которому её никогда не выставляли, разные
+    клиенты рисуют в этом месте разное — на телефоне у нас там оставалась
+    посторонняя подпись вместо списка команд.
+    """
     await bot.set_my_commands(BOT_COMMANDS, scope=BotCommandScopeDefault())
+    await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
 
 
 @router.message(CommandStart())
