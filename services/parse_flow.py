@@ -57,7 +57,7 @@ import enum
 from dataclasses import dataclass, field, replace
 
 from services.llm import LLMClient
-from services.voice_parsing import ParsedItem, ParseIssue, ParseResult, parse_transcript
+from services.voice_parsing import CONFIDENCE_THRESHOLD, ParsedItem, ParseIssue, ParseResult, parse_transcript
 
 # Сколько раз подряд можно уточнять. Упирается не в технику, а в человека:
 # если после трёх правок бот всё ещё не понял, дальше уточнять — издевательство,
@@ -181,6 +181,45 @@ async def start(
     )
 
 
+def split_attempts(
+    transcript: str,
+    items: list[ParsedItem],
+    *,
+    voice_file_id: str | None = None,
+    confidence_threshold: float = CONFIDENCE_THRESHOLD,
+) -> list[ParseAttempt]:
+    """
+    Разбить один результат разбора (несколько записей из одного голосового) на
+    независимые попытки — по одной на запись.
+
+    Так бот присылает не одно комбинированное подтверждение на всё голосовое,
+    а отдельную карточку на каждую запись — и это не просто буквальное
+    соответствие макету, а более честный UX: в "напомни позвонить маме и купи
+    корм коту" бот может быть уверен в задаче про корм, но не уверен в часе
+    звонка. С одним общим подтверждением слабая запись понижала бы
+    уверенность всего сообщения; здесь задача подтверждается сразу, а
+    сомнительная запись переспрашивается отдельно, независимо от остальных.
+
+    Используется, когда результат уже получен целиком одним вызовом модели
+    (bot/handlers/voice.py вызывает services.voice_parsing.parse_transcript
+    напрямую, а не через start()) — сюда, в отличие от start(), transcript
+    не парсится заново, только раскладывается по попыткам.
+    """
+    attempts = []
+    for item in items:
+        clean = item.confidence_score >= confidence_threshold
+        attempts.append(
+            ParseAttempt(
+                transcript=transcript,
+                state=FlowState.awaiting_confirmation if clean else FlowState.awaiting_explicit_confirmation,
+                items=[item],
+                issue=ParseIssue.none if clean else ParseIssue.low_confidence,
+                voice_file_id=voice_file_id,
+            )
+        )
+    return attempts
+
+
 def request_correction(attempt: ParseAttempt) -> ParseAttempt:
     """
     Нажата кнопка [Исправить].
@@ -258,7 +297,7 @@ def confirmation_text(attempt: ParseAttempt) -> str:
     Формулировка зависит от состояния: при сомнении бот не изображает
     уверенность, а честно говорит, что мог понять неправильно.
     """
-    lines = [_describe(item) for item in attempt.items]
+    lines = [describe_item(item) for item in attempt.items]
     body = "\n".join(f"• {line}" for line in lines)
 
     if attempt.state is FlowState.awaiting_confirmation:
@@ -281,7 +320,7 @@ def confirmation_text(attempt: ParseAttempt) -> str:
     return body
 
 
-def _describe(item: ParsedItem) -> str:
+def describe_item(item: ParsedItem) -> str:
     """Человеческое описание записи для подтверждения."""
     from db.models import ItemType
 
