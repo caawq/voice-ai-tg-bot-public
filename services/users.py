@@ -26,3 +26,16 @@ async def get_or_create_user(session: AsyncSession, telegram_id: int) -> User:
     session.add(user)
     await session.flush()  # получить user.id до коммита, он нужен для Item.user_id
     return user
+
+
+# Тема картинки недели (Промпт 5). Список закрытый и совпадает с CHECK-ом в
+# БД (ck_users_theme_valid, db/models.py) — проверка здесь не даёт кривому
+# значению даже дойти до записи, а не только не даёт ей закоммититься.
+VALID_THEMES = {"light", "dark"}
+
+
+def set_theme(user: User, theme: str) -> None:
+    """Сохранить выбор темы. Коммит — забота вызывающего кода (session_scope)."""
+    if theme not in VALID_THEMES:
+        raise ValueError(f"Неизвестная тема: {theme!r}. Доступно: {', '.join(sorted(VALID_THEMES))}.")
+    user.theme = theme

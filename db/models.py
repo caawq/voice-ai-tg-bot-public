@@ -84,6 +84,11 @@ class User(Base):
         String(64), nullable=False, server_default=text("'Europe/Moscow'")
     )
 
+    # Тема картинки недели (Промпт 5): бот не может надёжно узнать тему
+    # Telegram-клиента, поэтому для MVP всегда light, а пользователь может
+    # явно переключить командой /theme dark|light — выбор запоминается сюда.
+    theme: Mapped[str] = mapped_column(String(5), nullable=False, server_default=text("'light'"))
+
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -94,6 +99,8 @@ class User(Base):
         passive_deletes=True,
         foreign_keys="Item.user_id",
     )
+
+    __table_args__ = (CheckConstraint("theme IN ('light', 'dark')", name="ck_users_theme_valid"),)
 
     def __repr__(self) -> str:  # pragma: no cover - удобство отладки
         return f"<User id={self.id} tg={self.telegram_id} tz={self.timezone!r}>"
